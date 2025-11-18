@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Specter Hunt - Prototype</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #050608;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f0f0f0;
+    }
+
+    #gameContainer {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(circle at top, #12131a 0, #050608 60%);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Top-left HUD */
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 8px 12px;
+      background: rgba(8, 10, 16, 0.85);
+      border-radius: 8px;
+      border: 1px solid rgba(120, 200, 255, 0.2);
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    #hud .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #8ba0c6;
+      margin-bottom: 4px;
+    }
+
+    #hud .value {
+      font-weight: 600;
+    }
+
+    #hud .row {
+      margin-bottom: 4px;
+    }
+
+    /* Bottom-center controls hint */
+    #controlsHint {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      background: rgba(5, 6, 10, 0.8);
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 11px;
+      color: #a9b4d5;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* Small notification text (center-top) */
+    #notification {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 10px;
+      background: rgba(10, 12, 18, 0.85);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 11px;
+      color: #f5f5f5;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    /* Journal overlay */
+    #journalOverlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    #journal {
+      width: min(800px, 90vw);
+      height: min(480px, 80vh);
+      background: #0b0c10;
+      border-radius: 16px;
+      border: 1px solid rgba(126, 180, 255, 0.4);
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+    }
+
+    #journalLeft, #journalRight {
+      padding: 14px 16px;
+      overflow-y: auto;
+    }
+
+    #journalLeft {
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    #journal h2 {
+      font-size: 16px;
+      margin: 0 0 4px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #e4ecff;
+    }
+
+    #journal h3 {
+      font-size: 13px;
+      margin: 12px 0 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9fb1ff;
+    }
+
+    #journal p {
+      font-size: 12px;
+      color: #c3c8dd;
+      margin: 2px 0 6px;
+    }
+
+    .evidence-list label,
+    .ghost-list label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      color: #d2d7ef;
+    }
+
+    .evidence-list input,
+    .ghost-list input {
+      accent-color: #7fb3ff;
+    }
+
+    .ghost-list .ghost-item {
+      padding: 4px 6px;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      transition: background 0.2s, border 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .ghost-item.match {
+      background: rgba(96, 221, 188, 0.08);
+      border-color: rgba(96, 221, 188, 0.6);
+    }
+
+    .ghost-item.mismatch {
+      opacity: 0.3;
+    }
+
+    #lockInBtn {
+      margin-top: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #61d5ff, #4bf1c9);
+      color: #020308;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    #lockInResult {
+      margin-top: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* EMF bar & temp text inside HUD */
+    .emf-bar {
+      width: 100px;
+      height: 8px;
+      border-radius: 999px;
+      background: #161826;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .emf-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #44ff9a, #faff00, #ffb347, #ff3a3a);
+      transition: width 0.1s;
+    }
+
+    .status-tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border: 1px solid rgba(255,255,255,0.25);
+      margin-left: 4px;
+    }
+
+    .status-safe {
+      color: #67f7c3;
+      border-color: rgba(103, 247, 195, 0.5);
+    }
+
+    .status-hunt {
+      color: #ff5e7b;
+      border-color: rgba(255, 94, 123, 0.7);
+    }
+
+    .status-active {
+      color: #ffd56c;
+      border-color: rgba(255, 213, 108, 0.7);
+    }
+  </style>
+</head>
+<body>
+<div id="gameContainer">
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="hud">
+    <div class="row">
+      <span class="label">Current Item</span><br />
+      <span class="value" id="hudItem">Flashlight</span>
+    </div>
+    <div class="row">
+      <span class="label">Sanity</span><br />
+      <span class="value" id="hudSanity">100%</span>
+    </div>
+    <div class="row">
+      <span class="label">Ghost State</span><br />
+      <span class="value" id="hudGhostState">Passive</span>
+      <span id="hudGhostTag" class="status-tag status-safe">Calm</span>
+    </div>
+    <div class="row">
+      <span class="label">EMF</span><br />
+      <div class="emf-bar">
+        <div class="emf-fill" id="emfFill"></div>
+      </div>
+    </div>
+    <div class="row">
+      <span class="label">Temperature</span><br />
+      <span class="value" id="hudTemp">20.0°C</span>
+    </div>
+  </div>
+
+  <div id="controlsHint">
+    WASD = Move · Shift = Sprint · 1–4 = Tools · E = Interact (doors) · J = Journal · Avoid the ghost during hunts!
+  </div>
+
+  <div id="notification"></div>
+
+  <!-- Journal -->
+  <div id="journalOverlay">
+    <div id="journal">
+      <div id="journalLeft">
+        <h2>Evidence</h2>
+        <p>Select the clues you've found during the investigation.</p>
+        <div class="evidence-list">
+          <label><input type="checkbox" value="EMF 5" class="evidenceBox"> EMF Level 5</label>
+          <label><input type="checkbox" value="Freezing Temps" class="evidenceBox"> Freezing Temperatures</label>
+          <label><input type="checkbox" value="Spirit Box" class="evidenceBox"> Spirit Box</label>
+          <label><input type="checkbox" value="Ghost Writing" class="evidenceBox"> Ghost Writing (not in prototype yet)</label>
+          <label><input type="checkbox" value="DOTS" class="evidenceBox"> DOTS (not in prototype yet)</label>
+        </div>
+
+        <h3>Mission Note</h3>
+        <p>In this prototype, you are in a small house with a single ghost type secretly chosen at start.
+           Use EMF, Thermometer, and Spirit Box to determine its identity.</p>
+
+        <button id="lockInBtn">Lock In Ghost Type</button>
+        <div id="lockInResult"></div>
+      </div>
+      <div id="journalRight">
+        <h2>Ghost Types</h2>
+        <p>These are simplified versions, just for the prototype.</p>
+        <div class="ghost-list" id="ghostList">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ========================
+  // Basic Setup & Utilities
+  // ========================
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  // HUD elements
+  const hudItemEl = document.getElementById("hudItem");
+  const hudSanityEl = document.getElementById("hudSanity");
+  const hudGhostStateEl = document.getElementById("hudGhostState");
+  const hudGhostTagEl = document.getElementById("hudGhostTag");
+  const hudTempEl = document.getElementById("hudTemp");
+  const emfFillEl = document.getElementById("emfFill");
+  const notificationEl = document.getElementById("notification");
+
+  const journalOverlay = document.getElementById("journalOverlay");
+  const ghostListEl = document.getElementById("ghostList");
+  const evidenceCheckboxes = Array.from(document.querySelectorAll(".evidenceBox"));
+  const lockInBtn = document.getElementById("lockInBtn");
+  const lockInResult = document.getElementById("lockInResult");
+
+  let mouseX = 0;
+  let mouseY = 0;
+
+  canvas.addEventListener("mousemove", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
+  });
+
+  // ==============
+  // Input Handling
+  // ==============
+  const keys = {};
+  window.addEventListener("keydown", (e) => {
+    keys[e.key.toLowerCase()] = true;
+    if (e.key === "j" || e.key === "J") {
+      toggleJournal();
+    }
+  });
+  window.addEventListener("keyup", (e) => {
+    keys[e.key.toLowerCase()] = false;
+  });
+
+  // Prevent scrolling with space, etc., when focused
+  window.addEventListener("keydown", (e) => {
+    if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // =================
+  // World Definition
+  // =================
+  // World coordinates in pixels
+  const world = {
+    width: 1200,
+    height: 800
+  };
+
+  // Simple house layout: rectangles for walls
+  // Each wall: {x, y, w, h}
+  const walls = [
+    // Outer boundaries
+    { x: 100, y: 100, w: 1000, h: 20 },
+    { x: 100, y: 680, w: 1000, h: 20 },
+    { x: 100, y: 120, w: 20,   h: 560 },
+    { x: 1080, y: 120, w: 20, h: 560 },
+
+    // Inner walls (rooms)
+    // Vertical wall splitting left/right
+    { x: 500, y: 120, w: 20, h: 200 },
+    { x: 500, y: 380, w: 20, h: 300 },
+
+    // Horizontal wall top right room
+    { x: 520, y: 300, w: 560, h: 20 },
+
+    // Horizontal wall mid left
+    { x: 120, y: 400, w: 360, h: 20 }
+  ];
+
+  // Doors (simple: toggle open/closed; when open, they don't block)
+  const doors = [
+    // Between foyer (top left) and living (top right)
+    { x: 500, y: 320, w: 20, h: 40, open: false },
+    // Between living (top left) and hall (bottom left)
+    { x: 320, y: 400, w: 40, h: 20, open: false },
+    // Between hall (bottom left) and bedroom (bottom right)
+    { x: 500, y: 520, w: 20, h: 40, open: false }
+  ];
+
+  function getBlockingRects() {
+    // Walls always block; doors only when closed
+    const blocking = [...walls];
+    for (const d of doors) {
+      if (!d.open) blocking.push(d);
+    }
+    return blocking;
+  }
+
+  // ==========
+  // Player
+  // ==========
+  const player = {
+    x: 200,
+    y: 160,
+    radius: 12,
+    speed: 150,
+    sprintSpeed: 250,
+    stamina: 1.0, // 0..1
+    currentItem: 1, // 1=flashlight,2=emf,3=thermo,4=spirit box
+    sanity: 1.0, // 0..1
+    alive: true
+  };
+
+  // ==========
+  // Ghost
+  // ==========
+  const ghostStates = {
+    PASSIVE: "Passive",
+    ACTIVE: "Active",
+    HUNT: "Hunt"
+  };
+
+  const ghostRoom = {
+    x: 720,
+    y: 480,
+    w: 360,
+    h: 200
+  };
+
+  const ghostTypes = [
+    {
+      name: "Shade",
+      evidence: ["EMF 5", "Freezing Temps", "Ghost Writing"],
+      description: "Shy ghost. Becomes more active when you're alone in the ghost room."
+    },
+    {
+      name: "Revenant",
+      evidence: ["EMF 5", "Freezing Temps", "Spirit Box"],
+      description: "Terrifyingly fast when it has direct line-of-sight on you."
+    },
+    {
+      name: "Spirit",
+      evidence: ["EMF 5", "Spirit Box", "Ghost Writing"],
+      description: "Standard ghost. Balanced behavior and activity."
+    }
+  ];
+
+  // Pick a random real ghost for the run
+  const selectedGhostType = ghostTypes[Math.floor(Math.random() * ghostTypes.length)];
+
+  const ghost = {
+    x: ghostRoom.x + ghostRoom.w / 2,
+    y: ghostRoom.y + ghostRoom.h / 2,
+    radius: 12,
+    state: ghostStates.PASSIVE,
+    speedPassive: 40,
+    speedActive: 60,
+    speedHunt: 110,
+    targetX: null,
+    targetY: null,
+    timeSinceLastEvent: 0,
+    huntTimer: 0,
+    visible: false,
+    visibleTimer: 0
+  };
+
+  function isPointInRect(px, py, r) {
+    return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+  }
+
+  function randomPointInRect(r) {
+    return {
+      x: r.x + 20 + Math.random() * (r.w - 40),
+      y: r.y + 20 + Math.random() * (r.h - 40)
+    };
+  }
+
+  function distance(x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function lineIntersectsRect(x1, y1, x2, y2, rect) {
+    // Check line against each edge of rect
+    const xMin = rect.x, xMax = rect.x + rect.w;
+    const yMin = rect.y, yMax = rect.y + rect.h;
+
+    function lineIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+      const den = (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+      if (den === 0) return false;
+      const t = ((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/den;
+      const u = -((x1-x2)*(y1-y3)-(y1-y2)*(x1-x3))/den;
+      return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+    }
+
+    // Top
+    if (lineIntersect(x1, y1, x2, y2, xMin, yMin, xMax, yMin)) return true;
+    // Bottom
+    if (lineIntersect(x1, y1, x2, y2, xMin, yMax, xMax, yMax)) return true;
+    // Left
+    if (lineIntersect(x1, y1, x2, y2, xMin, yMin, xMin, yMax)) return true;
+    // Right
+    if (lineIntersect(x1, y1, x2, y2, xMax, yMin, xMax, yMax)) return true;
+
+    return false;
+  }
+
+  function hasLineOfSight(x1, y1, x2, y2) {
+    for (const rect of getBlockingRects()) {
+      if (lineIntersectsRect(x1, y1, x2, y2, rect)) return false;
+    }
+    return true;
+  }
+
+  // ========================
+  // Collision & Movement
+  // ========================
+  function tryMove(entity, dx, dy) {
+    const rects = getBlockingRects();
+    // Move X
+    entity.x += dx;
+    if (collidesWithRects(entity, rects)) {
+      entity.x -= dx;
+    }
+    // Move Y
+    entity.y += dy;
+    if (collidesWithRects(entity, rects)) {
+      entity.y -= dy;
+    }
+  }
+
+  function collidesWithRects(entity, rects) {
+    const r = entity.radius;
+    for (const rect of rects) {
+      const closestX = Math.max(rect.x, Math.min(entity.x, rect.x + rect.w));
+      const closestY = Math.max(rect.y, Math.min(entity.y, rect.y + rect.h));
+      const dist = distance(entity.x, entity.y, closestX, closestY);
+      if (dist < r) return true;
+    }
+    return false;
+  }
+
+  // ==========
+  // Tools
+  // ==========
+  const itemNames = {
+    1: "Flashlight",
+    2: "EMF Reader",
+    3: "Thermometer",
+    4: "Spirit Box"
+  };
+
+  window.addEventListener("keydown", (e) => {
+    if (["1","2","3","4"].includes(e.key)) {
+      player.currentItem = parseInt(e.key, 10);
+      updateHUDItem();
+      showNotification(itemNames[player.currentItem] + " equipped");
+    }
+    if (e.key.toLowerCase() === "e") {
+      tryInteract();
+    }
+  });
+
+  function updateHUDItem() {
+    hudItemEl.textContent = itemNames[player.currentItem] || "Unknown";
+  }
+
+  function tryInteract() {
+    // door opening/closing if near
+    const range = 40;
+    for (const d of doors) {
+      const cx = d.x + d.w / 2;
+      const cy = d.y + d.h / 2;
+      if (distance(player.x, player.y, cx, cy) < range) {
+        d.open = !d.open;
+        showNotification("Door " + (d.open ? "opened" : "closed"));
+        return;
+      }
+    }
+  }
+
+  // Simple equipment logic: EMF, Thermometer, Spirit Box
+  function getEMFLevel() {
+    // EMF based on distance to ghost and ghost activity
+    const dist = distance(player.x, player.y, ghost.x, ghost.y);
+    if (dist > 260) return 0;
+    let base = 1;
+    if (dist < 240) base = 2;
+    if (dist < 180) base = 3;
+    if (dist < 120) base = 4;
+    if (dist < 70) base = 5;
+    // If ghost is in hunt or active, bias towards higher EMF
+    if (ghost.state !== ghostStates.PASSIVE) {
+      base = Math.min(5, base + 1);
+    }
+    // Only EMF Level 5 is "real evidence" for selected ghost type if it has EMF 5
+    return base;
+  }
+
+  function getTemperature() {
+    // ambient 18–22°C, ghost room can go down to -10..0 if ghost is there
+    let base = 20;
+    const inGhostRoom = isPointInRect(player.x, player.y, ghostRoom);
+    if (inGhostRoom) {
+      // The lower the player sanity, the colder
+      base = 5 + 15 * (1 - player.sanity);
+      if (selectedGhostType.evidence.includes("Freezing Temps")) {
+        base -= 5;
+      }
+    }
+    // Slight random noise
+    base += (Math.random() - 0.5) * 0.3;
+    return base;
+  }
+
+  function spiritBoxResponsePossible() {
+    // Only if spirit box is one of the ghost's evidence
+    if (!selectedGhostType.evidence.includes("Spirit Box")) return false;
+    // Player must be in ghost room and ghost not passive
+    if (!isPointInRect(player.x, player.y, ghostRoom)) return false;
+    if (ghost.state === ghostStates.PASSIVE) return false;
+    // Random small chance each second while conditions met
+    return true;
+  }
+
+  let spiritBoxText = "";
+  let spiritBoxTimer = 0;
+
+  // ===================
+  // Sanity & Darkness
+  // ===================
+  function updateSanity(dt) {
+    // Dark areas: outside flashlight circle considered "dark",
+    // but for prototype we just reduce sanity slowly over time,
+    // more when closer to ghost.
+    let drain = 0.002; // per second
+    const d = distance(player.x, player.y, ghost.x, ghost.y);
+    if (d < 200) drain += 0.01;
+    if (ghost.state === ghostStates.HUNT) drain += 0.03;
+    player.sanity = Math.max(0, player.sanity - drain * dt);
+
+    const sanityPercent = Math.round(player.sanity * 100);
+    hudSanityEl.textContent = sanityPercent + "%";
+  }
+
+  // ====================
+  // Ghost AI & States
+  // ====================
+  function updateGhost(dt) {
+    ghost.timeSinceLastEvent += dt;
+
+    // check line-of-sight to player
+    const distToPlayer = distance(ghost.x, ghost.y, player.x, player.y);
+    const hasLOS = hasLineOfSight(ghost.x, ghost.y, player.x, player.y);
+
+    // State transitions
+    if (ghost.state === ghostStates.PASSIVE) {
+      // Become active if player is in or near ghost room or low sanity
+      if (isPointInRect(player.x, player.y, ghostRoom) || player.sanity < 0.7) {
+        ghost.state = ghostStates.ACTIVE;
+        ghost.timeSinceLastEvent = 0;
+      }
+    } else if (ghost.state === ghostStates.ACTIVE) {
+      // Chance to start a hunt if player sanity is low enough and enough time passed
+      const sanity = player.sanity;
+      if (sanity < 0.4 && ghost.timeSinceLastEvent > 5 && Math.random() < 0.1 * dt) {
+        ghost.state = ghostStates.HUNT;
+        ghost.huntTimer = 0;
+        ghost.timeSinceLastEvent = 0;
+        showNotification("The ghost has started a hunt!");
+      }
+    } else if (ghost.state === ghostStates.HUNT) {
+      ghost.huntTimer += dt;
+      if (ghost.huntTimer > 15) {
+        // End hunt after certain time
+        ghost.state = ghostStates.ACTIVE;
+        ghost.huntTimer = 0;
+        showNotification("The hunt has ended.");
+      }
+    }
+
+    // Movement
+    let speed = ghost.speedPassive;
+    if (ghost.state === ghostStates.ACTIVE) speed = ghost.speedActive;
+    if (ghost.state === ghostStates.HUNT) {
+      speed = ghost.speedHunt;
+      // Revenant-style speed boost when in LOS
+      if (selectedGhostType.name === "Revenant" && hasLOS) {
+        speed *= 1.7;
+      }
+    }
+
+    // Basic wandering target selection in ghost room during passive/active
+    if (ghost.state !== ghostStates.HUNT) {
+      if (ghost.targetX == null || distance(ghost.x, ghost.y, ghost.targetX, ghost.targetY) < 10) {
+        const p = randomPointInRect(ghostRoom);
+        ghost.targetX = p.x;
+        ghost.targetY = p.y;
+      }
+    } else {
+      // Hunt: target player if line of sight or last known position
+      ghost.targetX = player.x;
+      ghost.targetY = player.y;
+    }
+
+    // Move towards target
+    if (ghost.targetX != null) {
+      const dx = ghost.targetX - ghost.x;
+      const dy = ghost.targetY - ghost.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const vx = (dx / len) * speed * dt;
+      const vy = (dy / len) * speed * dt;
+      tryMove(ghost, vx, vy);
+    }
+
+    // Ghost visibility flicker
+    if (ghost.state === ghostStates.HUNT || ghost.state === ghostStates.ACTIVE) {
+      ghost.visibleTimer -= dt;
+      if (ghost.visibleTimer <= 0) {
+        ghost.visible = !ghost.visible;
+        ghost.visibleTimer = 0.2 + Math.random() * 0.6;
+      }
+    } else {
+      ghost.visible = false;
+    }
+
+    // If in hunt and very close to player with LOS → player dies
+    if (ghost.state === ghostStates.HUNT && distToPlayer < 25 && hasLOS && player.alive) {
+      player.alive = false;
+      showNotification("You were caught by the ghost!");
+    }
+
+    // HUD ghost state
+    hudGhostStateEl.textContent = ghost.state;
+    if (ghost.state === ghostStates.PASSIVE) {
+      hudGhostTagEl.textContent = "Calm";
+      hudGhostTagEl.className = "status-tag status-safe";
+    } else if (ghost.state === ghostStates.ACTIVE) {
+      hudGhostTagEl.textContent = "Agitated";
+      hudGhostTagEl.className = "status-tag status-active";
+    } else {
+      hudGhostTagEl.textContent = "Hunt";
+      hudGhostTagEl.className = "status-tag status-hunt";
+    }
+  }
+
+  // ==================
+  // Camera / Viewport
+  // ==================
+  function worldToScreen(wx, wy) {
+    // Center camera on player
+    const camX = player.x - canvas.width / 2;
+    const camY = player.y - canvas.height / 2;
+    return {
+      x: wx - camX,
+      y: wy - camY
+    };
+  }
+
+  function screenToWorld(sx, sy) {
+    const camX = player.x - canvas.width / 2;
+    const camY = player.y - canvas.height / 2;
+    return {
+      x: sx + camX,
+      y: sy + camY
+    };
+  }
+
+  // =================
+  // Rendering
+  // =================
+  function drawWorld() {
+    ctx.fillStyle = "#050609";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Floors (just a simple tiling color for rooms)
+    ctx.save();
+    ctx.fillStyle = "#111318";
+    const topLeft = worldToScreen(100,100);
+    const bottomRight = worldToScreen(1100,680);
+    ctx.fillRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+
+    // Ghost room highlight (very subtle)
+    const grTL = worldToScreen(ghostRoom.x, ghostRoom.y);
+    ctx.globalAlpha = 0.07;
+    ctx.fillStyle = "#3af5ff";
+    ctx.fillRect(grTL.x, grTL.y, ghostRoom.w, ghostRoom.h);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // Walls
+    ctx.fillStyle = "#1b1d26";
+    for (const w of walls) {
+      const p = worldToScreen(w.x, w.y);
+      ctx.fillRect(p.x, p.y, w.w, w.h);
+    }
+
+    // Doors
+    for (const d of doors) {
+      const p = worldToScreen(d.x, d.y);
+      ctx.save();
+      if (d.open) {
+        ctx.fillStyle = "#374151";
+      } else {
+        ctx.fillStyle = "#8b5a3c";
+      }
+      ctx.fillRect(p.x, p.y, d.w, d.h);
+      ctx.restore();
+    }
+  }
+
+  function drawEntities() {
+    // Player
+    const p = worldToScreen(player.x, player.y);
+
+    // Draw player body
+    ctx.save();
+    ctx.fillStyle = player.alive ? "#7ff0ff" : "#7f7f7f";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, player.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Draw flashlight direction line (small)
+    const dir = getLookDirection();
+    ctx.save();
+    ctx.strokeStyle = "rgba(193, 230, 255,0.7)";
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x + dir.x * 20, p.y + dir.y * 20);
+    ctx.stroke();
+    ctx.restore();
+
+    // Ghost
+    const g = worldToScreen(ghost.x, ghost.y);
+    if (ghost.visible || ghost.state === ghostStates.HUNT) {
+      ctx.save();
+      let alpha = ghost.visible ? 0.8 : 0.25;
+      ctx.globalAlpha = alpha;
+      const gradient = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, ghost.radius * 3);
+      gradient.addColorStop(0, "#f5f5f5");
+      gradient.addColorStop(0.5, "#d2f3ff");
+      gradient.addColorStop(1, "rgba(210,243,255,0)");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, ghost.radius * 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, ghost.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function getLookDirection() {
+    const screenPlayer = worldToScreen(player.x, player.y);
+    const worldMouse = screenToWorld(mouseX, mouseY);
+    let vx = worldMouse.x - player.x;
+    let vy = worldMouse.y - player.y;
+    const len = Math.sqrt(vx * vx + vy * vy);
+    if (len === 0) return { x: 1, y: 0 };
+    return { x: vx / len, y: vy / len };
+  }
+
+  function drawLighting() {
+    const screenPlayer = worldToScreen(player.x, player.y);
+    const dir = getLookDirection();
+
+    ctx.save();
+    // Dark overlay
+    ctx.fillStyle = "rgba(0,0,0,0.92)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Flashlight cone
+    const coneRadius = 260;
+    const coneAngle = Math.PI / 4; // 45 degrees
+    const steps = 40;
+
+    const gradient = ctx.createRadialGradient(
+      screenPlayer.x, screenPlayer.y, 6,
+      screenPlayer.x, screenPlayer.y, coneRadius
+    );
+    gradient.addColorStop(0, "rgba(255,255,255,0.9)");
+    gradient.addColorStop(0.4, "rgba(230,240,255,0.4)");
+    gradient.addColorStop(1, "rgba(0,0,0,0)");
+
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.moveTo(screenPlayer.x, screenPlayer.y);
+
+    const baseAngle = Math.atan2(dir.y, dir.x);
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const angle = baseAngle - coneAngle / 2 + coneAngle * t;
+      const x = screenPlayer.x + Math.cos(angle) * coneRadius;
+      const y = screenPlayer.y + Math.sin(angle) * coneRadius;
+      ctx.lineTo(x, y);
+    }
+
+    ctx.closePath();
+    ctx.fill();
+
+    // Small ambient circle (so you're never fully blind, even behind)
+    const ambientGrad = ctx.createRadialGradient(
+      screenPlayer.x, screenPlayer.y, 0,
+      screenPlayer.x, screenPlayer.y, 80
+    );
+    ambientGrad.addColorStop(0, "rgba(255,255,255,0.35)");
+    ambientGrad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = ambientGrad;
+    ctx.beginPath();
+    ctx.arc(screenPlayer.x, screenPlayer.y, 80, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawUIOverlays() {
+    // Spirit box response bubble near player if active
+    if (spiritBoxText && spiritBoxTimer > 0) {
+      const p = worldToScreen(player.x, player.y);
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, spiritBoxTimer / 1.5);
+      ctx.fillStyle = "rgba(18, 22, 35, 0.88)";
+      const padding = 6;
+      ctx.font = "11px system-ui";
+      const text = spiritBoxText;
+      const textWidth = ctx.measureText(text).width;
+      const bubbleWidth = textWidth + padding * 2;
+      const bubbleHeight = 20;
+      const bx = p.x - bubbleWidth / 2;
+      const by = p.y - 40;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bubbleWidth, bubbleHeight, 8);
+      ctx.fill();
+      ctx.fillStyle = "#7ff3d8";
+      ctx.fillText(text, bx + padding, by + 13);
+      ctx.restore();
+    }
+  }
+
+  function showNotification(text) {
+    notificationEl.textContent = text;
+    notificationEl.style.opacity = "1";
+    clearTimeout(showNotification._timer);
+    showNotification._timer = setTimeout(() => {
+      notificationEl.style.opacity = "0";
+    }, 2000);
+  }
+
+  // ==============
+  // Journal Logic
+  // ==============
+  function populateGhostList() {
+    ghostListEl.innerHTML = "";
+    ghostTypes.forEach((g, idx) => {
+      const div = document.createElement("div");
+      div.className = "ghost-item";
+      div.dataset.index = idx;
+      const label = document.createElement("label");
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "ghostRadio";
+      radio.value = g.name;
+      const span = document.createElement("span");
+      span.textContent = g.name + " (" + g.evidence.join(", ") + ")";
+      label.appendChild(radio);
+      label.appendChild(span);
+
+      const p = document.createElement("p");
+      p.textContent = g.description;
+
+      div.appendChild(label);
+      div.appendChild(p);
+      ghostListEl.appendChild(div);
+    });
+    updateGhostEvidenceMatches();
+  }
+
+  function getSelectedEvidence() {
+    return evidenceCheckboxes.filter(c => c.checked).map(c => c.value);
+  }
+
+  function updateGhostEvidenceMatches() {
+    const selected = getSelectedEvidence();
+    const items = Array.from(ghostListEl.getElementsByClassName("ghost-item"));
+    items.forEach((item, idx) => {
+      const ghostData = ghostTypes[idx];
+      const evSet = new Set(ghostData.evidence);
+      const selectedSet = new Set(selected);
+      const matchesAllSelected = [...selectedSet].every(e => evSet.has(e));
+      const matchesAllGhost = ghostData.evidence.every(e => selectedSet.has(e));
+
+      item.classList.remove("match", "mismatch");
+      if (selected.length === 0) return;
+
+      if (matchesAllSelected) {
+        item.classList.add("match");
+      } else {
+        item.classList.add("mismatch");
+      }
+    });
+  }
+
+  evidenceCheckboxes.forEach(c => {
+    c.addEventListener("change", () => {
+      updateGhostEvidenceMatches();
+    });
+  });
+
+  function toggleJournal() {
+    const visible = journalOverlay.style.display === "flex";
+    if (visible) {
+      journalOverlay.style.display = "none";
+    } else {
+      journalOverlay.style.display = "flex";
+    }
+  }
+
+  lockInBtn.addEventListener("click", () => {
+    const selectedRadio = ghostListEl.querySelector("input[name='ghostRadio']:checked");
+    if (!selectedRadio) {
+      lockInResult.textContent = "Select a ghost type first.";
+      lockInResult.style.color = "#ffd56c";
+      return;
+    }
+    const chosen = selectedRadio.value;
+    if (chosen === selectedGhostType.name) {
+      lockInResult.textContent = "Correct! It was a " + chosen + ".";
+      lockInResult.style.color = "#67f7c3";
+    } else {
+      lockInResult.textContent = "Incorrect. It was actually a " + selectedGhostType.name + ".";
+      lockInResult.style.color = "#ff7c7c";
+    }
+  });
+
+  // ===============
+  // Game Loop
+  // ===============
+  let lastTime = performance.now();
+
+  function gameLoop(timestamp) {
+    const dt = Math.min(0.05, (timestamp - lastTime) / 1000);
+    lastTime = timestamp;
+
+    update(dt);
+    render();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function update(dt) {
+    if (journalOverlay.style.display === "flex") {
+      // Pause world when journal open
+      return;
+    }
+
+    if (!player.alive) {
+      // Allow camera & darkness to still draw, but no movement/updates
+      return;
+    }
+
+    updatePlayer(dt);
+    updateGhost(dt);
+    updateSanity(dt);
+    updateEquipment(dt);
+  }
+
+  function updatePlayer(dt) {
+    let moveX = 0;
+    let moveY = 0;
+    if (keys["w"]) moveY -= 1;
+    if (keys["s"]) moveY += 1;
+    if (keys["a"]) moveX -= 1;
+    if (keys["d"]) moveX += 1;
+
+    let len = Math.sqrt(moveX * moveX + moveY * moveY);
+    if (len > 0) {
+      moveX /= len;
+      moveY /= len;
+    }
+
+    // Sprint with shift
+    let speed = player.speed;
+    if (keys["shift"]) {
+      if (player.stamina > 0.15) {
+        speed = player.sprintSpeed;
+        player.stamina = Math.max(0, player.stamina - 0.5 * dt);
+      }
+    } else {
+      player.stamina = Math.min(1, player.stamina + 0.3 * dt);
+    }
+
+    tryMove(player, moveX * speed * dt, moveY * speed * dt);
+  }
+
+  function updateEquipment(dt) {
+    const emfLevel = getEMFLevel();
+    const emfPercent = (emfLevel / 5) * 100;
+    emfFillEl.style.width = emfPercent + "%";
+
+    const temp = getTemperature();
+    hudTempEl.textContent = temp.toFixed(1) + "°C";
+
+    // Spirit box
+    spiritBoxTimer -= dt;
+    if (spiritBoxTimer <= 0) {
+      spiritBoxText = "";
+    }
+
+    if (player.currentItem === 4 && spiritBoxResponsePossible()) {
+      if (Math.random() < 0.6 * dt) { // fairly rare
+        const responses = [
+          "LEAVE",
+          "BEHIND YOU",
+          "DIE",
+          "I SEE YOU",
+          "HERE",
+          "RUN"
+        ];
+        spiritBoxText = responses[Math.floor(Math.random() * responses.length)];
+        spiritBoxTimer = 2.0;
+        showNotification("Spirit Box responded...");
+      }
+    }
+  }
+
+  function render() {
+    drawWorld();
+    drawEntities();
+    drawLighting();
+    drawUIOverlays();
+  }
+
+  // Initial setup
+  populateGhostList();
+  updateHUDItem();
+  showNotification("Find the ghost room and gather evidence. Press J for Journal.");
+
+  requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
